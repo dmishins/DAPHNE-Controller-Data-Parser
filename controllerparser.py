@@ -29,17 +29,14 @@ class pulse:
 class spill:
 	headerlen = 32
 	maxlen = 0
-	def __init__(self, data):
+	def __init__(self, data, spillno):
 		self.header = None
 		self.controllerheader = None
 		self.ubun = None
-		self.controllerheader = None
-		self.controllerheader = None
-		self.controllerheader = None
-		self.controllerheader = None
-		self.controllerheader = None
-
+		self.spillno = spillno
 		self.extract(data)
+
+
 	def extract(self, data):
 		self.pulses = []
 		self.data=[filter(None, line.rstrip().split(" ")) for line in data]
@@ -52,8 +49,9 @@ class spill:
 		self.ubun = self.signals[0:2]
 		self.ptr = 2
 		#print self.controllerheader[1]
-		#print "here " + str(int(self.controllerheader[2],16)-11)
+		#print "here " + str(int(self.controllerheader[2],16)-10)
 		while self.ptr < int(self.controllerheader[2],16)-10:
+			#print self.ptr, self.signals[self.ptr]
 			chno = int(self.signals[self.ptr], 16)
 			self.chinspill.add(chno)
 			#print self.signals[self.ptr]
@@ -62,14 +60,16 @@ class spill:
 			#print chno, chlen, choffset
 			self.pulses.append(pulse(chno, chlen, choffset, [int(sig, 16) for sig in self.signals[self.ptr+2:(self.ptr+2+chlen)]]))
 			self.ptr += (2+chlen)
-	def process(self, i):
+		self.wdcnt = self.ptr
+		print "Spill " + str(self.spillno) + " wdcnt : " + str(self.wdcnt)
+	def process(self):
 		for ch in self.chinspill:
 			waveform = [None]*256
 			for pulse in self.pulses:
 				if pulse.chno == ch:
 					waveform[pulse.choffset:pulse.choffset+1+pulse.chlen] = pulse.signal
 			plt.plot(waveform)
-			plt.title("Spill: " + str(i) + " Ch: "+ str(ch))
+			plt.title("Spill: " + str(self.spillno) + " Ch: "+ str(ch))
 			plt.show()
 
 
@@ -77,15 +77,17 @@ def process_file(path, spills):
 	f = open(path, "r")
 	lines = f.readlines()
 	lineptr = 0
+	spillno = 0
 	print "No. Of Lines: ", len(lines)
 	while lineptr < len(lines)-1:
 		print "HEADER: ", lines[lineptr]
 		linesinspill = int(filter(None, lines[lineptr].rstrip().split(" "))[3],16)
-		print linesinspill
+		print "Lines In Spill: " + str(linesinspill)
 		
 		#print lines[lineptr:lineptr+linesinspill+1]
-		spills.append(spill(lines[lineptr:lineptr+linesinspill+1]))
+		spills.append(spill(lines[lineptr:lineptr+linesinspill+1], spillno))
 		lineptr += linesinspill+1
+		spillno += 1
 
 
 spills = []
@@ -95,7 +97,7 @@ if spills:
 	print "Number of Spills Processed: ", len(spills)
 	for i, spill in enumerate(spills):
 		print "Spill " + str(i) + " has "+ str(len(spill.pulses)) + " pulses"
-		spill.process(i)
+		spill.process()
 
 
 else:
